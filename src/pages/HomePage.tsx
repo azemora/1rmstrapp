@@ -20,7 +20,7 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, date, navigation 
 
   let displaySets = isManual ? exercise.manualSets : phaseInfo.sets;
   let displayReps = isManual ? exercise.manualReps : phaseInfo.reps;
-  let displayLoad = 'Calibrar'; // Padrão
+  let displayLoad = 'Calibrar';
 
   if (isManual) {
     displayLoad = exercise.manualLoad || 'Definir';
@@ -47,11 +47,10 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, date, navigation 
     </View>
   );
 };
-  
+
 const RestDay = () => (
     <View style={styles.card}>
       <Text style={styles.exerciseName}>Dia de Descanso!</Text>
-      <Text style={styles.exerciseDetails}>Aproveite para se recuperar.</Text>
     </View>
 );
 
@@ -61,48 +60,63 @@ const HomePage = () => {
   const { activeProfile } = useContext(TrainingContext);
   
   const dayOfWeek = selectedDate.getDay();
-  const workoutForDay = activeProfile?.plan ? activeProfile.plan[dayOfWeek] : null;
+  const muscleGroupsForDay = activeProfile?.weeklySplit[dayOfWeek] || [];
+  const exercisesForDay: Exercise[] = [];
+  let workoutName = 'Descanso';
+
+  if (activeProfile && muscleGroupsForDay.length > 0) {
+      workoutName = muscleGroupsForDay.map(mg => activeProfile.templates[mg].name).join(' & ');
+      muscleGroupsForDay.forEach(mg => {
+          if (activeProfile.templates[mg]) {
+              exercisesForDay.push(...activeProfile.templates[mg].exercises);
+          }
+      });
+  }
 
   const phaseInfo = getTrainingPhase(selectedDate);
   const phaseConfig = TRAINING_PHASES[phaseInfo.phase];
 
   return (
     <SafeAreaView style={styles.container}>
-        <ScrollView contentContainerStyle={styles.scrollView}>
-            <CalendarComponent onDateSelect={setSelectedDate} />
-            
-            <View style={styles.actionButtonsContainer}>
+      <ScrollView contentContainerStyle={styles.scrollView}>
+          <CalendarComponent onDateSelect={setSelectedDate} />
+          
+          <View style={styles.actionButtonsContainer}>
+              {/* AQUI: Enviamos o dia da semana selecionado como parâmetro */}
               <TouchableOpacity 
-                onPress={() => navigation.navigate('Setup', { selectedDay: selectedDate.getDay() })} // Enviando o dia da semana
+                onPress={() => navigation.navigate('Setup', { selectedDay: selectedDate.getDay() })} 
                 style={[styles.button, styles.editButton]}
               >
                   <Text style={styles.buttonText}>Adicionar/Editar</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-    onPress={() => navigation.navigate('ActiveWorkout', { workout: workoutForDay })} 
-    style={[styles.startButton, {backgroundColor: phaseConfig.color}]}
->
-    <Text style={styles.startButtonText}>Começar Treino</Text>
-</TouchableOpacity>
-            </View>
+              <TouchableOpacity onPress={() => {
+                  if (exercisesForDay.length > 0) {
+                      navigation.navigate('ActiveWorkout', { workout: { dayName: workoutName, exercises: exercisesForDay } });
+                  } else {
+                      Alert.alert("Dia de Descanso", "Não há treino para hoje.");
+                  }
+              }} style={[styles.button, {backgroundColor: phaseConfig.color}]}>
+                  <Text style={styles.buttonText}>Começar Treino</Text>
+              </TouchableOpacity>
+          </View>
+          
+          <View style={styles.headerContainer}>
+              <Text style={styles.workoutName}>{workoutName}</Text>
+              {exercisesForDay.length > 0 && 
+                <Text style={[styles.phaseTitle, {color: phaseConfig.color}]}>{phaseConfig.name}</Text>
+              }
+          </View>
 
-            <View style={styles.headerContainer}>
-                <Text style={styles.workoutName}>{workoutForDay ? workoutForDay.dayName : 'Descanso'}</Text>
-                {workoutForDay && workoutForDay.exercises.length > 0 && 
-                  <Text style={[styles.phaseTitle, {color: phaseConfig.color}]}>{phaseConfig.name}</Text>
-                }
-            </View>
-
-            {workoutForDay && workoutForDay.exercises.length > 0 && activeProfile ? (
-                workoutForDay.exercises.map((exercise: Exercise) => 
-                  <ExerciseCard 
-                    key={exercise.id} 
-                    exercise={exercise}
-                    date={selectedDate}
-                    navigation={navigation}
-                  />)
-            ) : ( <RestDay /> )}
-        </ScrollView>
+          {exercisesForDay.length > 0 && activeProfile ? (
+              exercisesForDay.map((exercise: Exercise) => 
+                <ExerciseCard 
+                  key={exercise.id} 
+                  exercise={exercise}
+                  date={selectedDate}
+                  navigation={navigation}
+                />)
+          ) : ( <RestDay /> )}
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -122,8 +136,6 @@ const styles = StyleSheet.create({
     exerciseName: { fontSize: 20, fontWeight: 'bold', color: '#F9FAFB', flexShrink: 1, paddingRight: 10 },
     exerciseDetails: { fontSize: 16, color: '#D1D5DB' },
     detailsRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#374151' },
-     startButton: { paddingVertical: 10, paddingHorizontal: 15, borderRadius: 8 },
-    startButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
 });
 
 export default HomePage;

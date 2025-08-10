@@ -1,5 +1,6 @@
 import { NavigatorScreenParams } from '@react-navigation/native';
-import { Exercise, WorkoutDay } from "../context/TrainingContext";
+import { WorkoutTemplate } from '../context/TrainingContext'; 
+import { Exercise } from "../context/TrainingContext"; 
 
 export type HomeStackParamList = {
   HomePage: undefined;
@@ -7,8 +8,9 @@ export type HomeStackParamList = {
     exercise: Exercise;
     phaseInfo: { name: string; color: string; rest: number; sets: number | string; reps: string };
   };
-  ActiveWorkout: {
-    workout: WorkoutDay;
+    ActiveWorkout: {
+    // A propriedade agora é um WorkoutTemplate
+    workout: WorkoutTemplate | null; 
   };
 };
 

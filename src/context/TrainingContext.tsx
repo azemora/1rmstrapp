@@ -1,190 +1,108 @@
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { trainingPlan as initialPlan } from '../data/trainingPlan';
 
-// --- ESTRUTURAS DE TIPO ---
+// --- ESTRUTURAS DE TIPO (ÚNICA FONTE DA VERDADE) ---
 export type Exercise = {
-  id: number;
-  name: string;
-  masterId: string; // Mantemos para a metadata do exercício
-  
-  // Propriedade para controlar o modo
-  mode: 'calibrated' | 'manual';
-
-  // Propriedades para o modo 'calibrated'
-  testWeight?: string;
-  testReps?: string;
-  oneRepMax?: number;
-  calculatedTotalWeight?: number;
-
-  // Propriedades para o modo 'manual'
-  manualSets?: string;
-  manualReps?: string;
-  manualLoad?: string;
+  id: number; name: string; masterId: string; mode: 'calibrated' | 'manual';
+  oneRepMax?: number; testWeight?: string; testReps?: string; calculatedTotalWeight?: number;
+  manualSets?: string; manualReps?: string; manualLoad?: string;
 };
-
-export type LoggedSet = {
-    reps: number;
-    load: number;
-};
-
-export type WorkoutLog = {
-    date: string; // ex: "2025-08-09"
-    exerciseId: string;
-    sets: LoggedSet[];
-};
-
-export type WorkoutDay = { dayName: string; exercises: Exercise[]; } | null;
-export type Plan = { [key: number]: WorkoutDay; };
-export type CalibrationData = { exerciseId: string; weight: number; reps: number; oneRepMax: number; } | null;
-
+export type WorkoutTemplate = { name: string; exercises: Exercise[]; };
+export type WeeklySplit = { [key: number]: string[]; };
+export type WorkoutLog = { date: string; exerciseId: string; sets: { reps: number; load: number }[]; };
 export type Profile = {
-  id: string;
-  name: string;
-  plan: Plan;
-  methodology: 'calibrated' | 'custom';
-  calibration: CalibrationData;
-  history: WorkoutLog[]; 
+  id: string; name: string;
+  templates: { [muscleGroup: string]: WorkoutTemplate };
+  weeklySplit: WeeklySplit;
+  history: WorkoutLog[];
 };
-
 export type ProfilesData = {
   activeProfileId: string | null;
   profiles: { [key: string]: Profile };
 };
 
+// --- INTERFACE DO CONTEXTO ---
 interface TrainingContextType {
   profilesData: ProfilesData;
-  activePlan: Plan | null;
   activeProfile: Profile | null;
+  updateActiveProfile: (updatedProfile: Profile) => void;
+  createNewProfile: (name: string) => void;
   setActiveProfile: (profileId: string) => void;
-  updateActivePlan: (newPlan: Plan) => void;
-  createNewProfile: (name: string, methodology: 'calibrated' | 'custom') => void;
-  updateCalibrationData: (data: CalibrationData) => void;
   deleteProfile: (profileId: string) => void;
 }
 
-// --- PLANO INICIAL E PADRÕES ---
-const blankPlan: Plan = {
-  0: null, 1: { dayName: 'Segunda', exercises: [] }, 2: null, 3: { dayName: 'Quarta', exercises: [] },
-  4: null, 5: { dayName: 'Sexta', exercises: [] }, 6: null,
+// --- DADOS PADRÃO ---
+export const MUSCLE_GROUPS = ['peito', 'costas', 'pernas', 'ombro', 'biceps', 'triceps'];
+const blankTemplates: { [muscleGroup: string]: WorkoutTemplate } = {};
+MUSCLE_GROUPS.forEach(group => {
+  blankTemplates[group] = { name: group.charAt(0).toUpperCase() + group.slice(1), exercises: [] };
+});
+const defaultWeeklySplit: WeeklySplit = {
+  0: [], 1: ['biceps', 'costas'], 2: ['peito', 'triceps', 'ombro'], 3: ['pernas'],
+  4: ['biceps', 'costas'], 5: ['pernas', 'peito'], 6: ['triceps', 'ombro'],
 };
-
 const defaultProfile: Profile = {
-    id: 'default',
-    name: 'Plano Padrão',
-    plan: blankPlan,
-    methodology: 'calibrated',
-    calibration: null,
-    history: []
-}
-
+    id: 'default', name: 'Plano Padrão',
+    templates: blankTemplates, weeklySplit: defaultWeeklySplit, history: [],
+};
 const defaultProfilesData: ProfilesData = {
   activeProfileId: 'default',
   profiles: { 'default': defaultProfile },
 };
 
-// --- CONTEXTO ---
+// --- CRIAÇÃO E PROVEDOR DO CONTEXTO ---
 export const TrainingContext = createContext<TrainingContextType>({
-  profilesData: defaultProfilesData,
-  activePlan: null,
-  activeProfile: null,
-  setActiveProfile: () => {},
-  updateActivePlan: () => {},
-  createNewProfile: () => {},
-  updateCalibrationData: () => {},
-  deleteProfile: () => {}
-
+    profilesData: defaultProfilesData,
+    activeProfile: null,
+    updateActiveProfile: () => {},
+    createNewProfile: () => {},
+    setActiveProfile: () => {},
+    deleteProfile: () => {},
 });
 
-// --- PROVEDOR ---
-interface TrainingProviderProps {
-  children: ReactNode;
-}
+export const TrainingProvider = ({ children }: { children: ReactNode }) => {
+    const [profilesData, setProfilesData] = useState<ProfilesData>(defaultProfilesData);
+    
+    // ... useEffects para carregar e salvar ...
 
-export const TrainingProvider = ({ children }: TrainingProviderProps) => {
-  const [profilesData, setProfilesData] = useState<ProfilesData>(defaultProfilesData);
-
-  useEffect(() => {
-    const loadProfiles = async () => {
-      try {
-        const savedData = await AsyncStorage.getItem('profilesData');
-        if (savedData) {
-          setProfilesData(JSON.parse(savedData));
-        }
-      } catch (error) { console.error("Failed to load profiles", error); }
+    const createNewProfile = (name: string) => {
+        const newId = `profile_${Date.now()}`;
+        const newProfile: Profile = {
+            id: newId, name,
+            templates: blankTemplates, weeklySplit: defaultWeeklySplit, history: [],
+        };
+        setProfilesData(prevData => ({
+            profiles: { ...prevData.profiles, [newId]: newProfile },
+            activeProfileId: newId,
+        }));
     };
-    loadProfiles();
-  }, []);
 
-  useEffect(() => {
-    const saveProfiles = async () => {
-      try {
-        await AsyncStorage.setItem('profilesData', JSON.stringify(profilesData));
-      } catch (error) { console.error("Failed to save profiles", error); }
+    const updateActiveProfile = (updatedProfile: Profile) => {
+        if (!profilesData.activeProfileId) return;
+        setProfilesData(prevData => ({
+            ...prevData,
+            profiles: { ...prevData.profiles, [prevData.activeProfileId!]: updatedProfile }
+        }));
     };
-    saveProfiles();
-  }, [profilesData]);
 
-  const setActiveProfile = (profileId: string) => {
-    setProfilesData(prevData => ({ ...prevData, activeProfileId: profileId }));
-  };
+    const setActiveProfile = (profileId: string) => {
+        setProfilesData(prevData => ({ ...prevData, activeProfileId: profileId }));
+    };
+    
+    const deleteProfile = (profileId: string) => {
+        setProfilesData(prevData => {
+            const updatedProfiles = { ...prevData.profiles };
+            delete updatedProfiles[profileId];
+            const newActiveProfileId = prevData.activeProfileId === profileId ? null : prevData.activeProfileId;
+            return { ...prevData, profiles: updatedProfiles, activeProfileId: newActiveProfileId };
+        });
+    };
+ const activeProfile = profilesData.activeProfileId ? profilesData.profiles[profilesData.activeProfileId] : null;
+    const value = { profilesData, activeProfile, updateActiveProfile, createNewProfile, setActiveProfile, deleteProfile };
 
-  const updateActivePlan = (newPlan: Plan) => {
-    if (!profilesData.activeProfileId) return;
-    setProfilesData(prevData => {
-      const activeId = prevData.activeProfileId!;
-      const updatedProfiles = { ...prevData.profiles };
-      updatedProfiles[activeId].plan = newPlan;
-      return { ...prevData, profiles: updatedProfiles };
-    });
-  };
-
-  const deleteProfile = (profileId: string) => {
-    setProfilesData(prevData => {
-        const updatedProfiles = { ...prevData.profiles };
-        delete updatedProfiles[profileId];
-
-        // Se o perfil deletado era o ativo, reseta o perfil ativo
-        const newActiveProfileId = prevData.activeProfileId === profileId ? null : prevData.activeProfileId;
-
-        return { ...prevData, profiles: updatedProfiles, activeProfileId: newActiveProfileId };
-    });
-};
-
-  const createNewProfile = (name: string, methodology: 'calibrated' | 'custom') => {
-      const newId = `profile_${Date.now()}`;
-      const newProfile: Profile = {
-          id: newId,
-          name,
-          plan: blankPlan,
-          methodology,
-          calibration: null,
-          history: []
-      };
-      setProfilesData(prevData => {
-          const updatedProfiles = { ...prevData.profiles, [newId]: newProfile };
-          return { ...prevData, profiles: updatedProfiles, activeProfileId: newId };
-      });
-  };
-
-  const updateCalibrationData = (data: CalibrationData) => {
-    if (!profilesData.activeProfileId) return;
-    setProfilesData(prevData => {
-        const activeId = prevData.activeProfileId!;
-        const updatedProfiles = { ...prevData.profiles };
-        updatedProfiles[activeId].calibration = data;
-        return { ...prevData, profiles: updatedProfiles };
-    });
-  };
-
-  const activeProfile = profilesData.activeProfileId ? profilesData.profiles[profilesData.activeProfileId] : null;
-  const activePlan = activeProfile?.plan || null;
-
-  const value = { profilesData, activePlan, activeProfile, setActiveProfile, updateActivePlan, createNewProfile, updateCalibrationData, deleteProfile};
-
-  return (
-    <TrainingContext.Provider value={value}>
-      {children}
-    </TrainingContext.Provider>
-  );
+    return (
+        <TrainingContext.Provider value={value}>
+            {children}
+        </TrainingContext.Provider>
+    );
 };
