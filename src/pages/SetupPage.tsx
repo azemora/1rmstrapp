@@ -1,219 +1,207 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
+import { useRoute, RouteProp } from '@react-navigation/native';
 import { TrainingContext, Exercise } from '../context/TrainingContext';
-import { masterExerciseList } from '../data/masterExerciseList';
 import { calculate1RM } from '../utils/formulas';
 import Switch from '../components/Switch';
+import Icon from 'react-native-vector-icons/Ionicons';
+import { Picker } from '@react-native-picker/picker';
 
-// --- DEFINIÇÕES DE TIPO ---
-interface CustomExerciseRowProps {
-  exercise: Exercise;
-  onExerciseChange: (exerciseId: number, field: keyof Exercise, value: string) => void;
-  onRemove: (exerciseId: number) => void;
-  onSave: (exerciseId: number) => void;
-}
-
-// --- Sub-componente para a Linha do Exercício (Modo CUSTOM) ---
-const CustomExerciseRow: React.FC<CustomExerciseRowProps> = ({ exercise, onExerciseChange, onRemove, onSave }) => {
+// --- Sub-componente para a Linha do Exercício ---
+const ExerciseSetupRow: React.FC<{ exercise: Exercise; onUpdate: (ex: Exercise) => void; onRemove: (id: number) => void; }> = ({ exercise, onUpdate, onRemove }) => {
+  const [localExercise, setLocalExercise] = useState(exercise);
   const [weightMode, setWeightMode] = useState('total');
-  const masterExercise = masterExerciseList.find(e => e.id === exercise.masterId);
-  const isBilateral = masterExercise?.inputType === 'bilateral';
 
-  const handleValueChange = (field: keyof Exercise, value: string) => {
-    onExerciseChange(exercise.id, field, value);
+  // Sincroniza o estado local se a prop externa mudar
+  useEffect(() => {
+    setLocalExercise(exercise);
+  }, [exercise]);
+
+  const handleValueChange = (field: keyof Exercise, value: string | boolean) => {
+    setLocalExercise(current => ({ ...current, [field]: value }));
   };
-  
-  const totalWeightForCalc = () => {
-    const weight = parseFloat(exercise.testWeight || '0');
-    if (isBilateral && weightMode === 'perSide') {
-      const barWeight = masterExercise?.barbellWeight || 0;
-      return (weight * 2) + barWeight;
+
+  const handleSave = () => {
+    let exerciseToSave = { ...localExercise };
+    
+    if (exerciseToSave.mode === 'calibrated') {
+      if (!exerciseToSave.testWeight || !exerciseToSave.testReps) {
+        Alert.alert('Erro', 'Preencha o peso e as repetições para salvar a calibragem.');
+        return;
+      }
+      const totalWeight = () => {
+        const weight = parseFloat(exerciseToSave.testWeight || '0');
+        if (weightMode === 'perSide') {
+          return (weight * 2);
+        }
+        return weight;
+      };
+      exerciseToSave.oneRepMax = calculate1RM(totalWeight(), parseInt(exerciseToSave.testReps || '0', 10));
     }
-    return weight;
+    onUpdate(exerciseToSave);
+    Alert.alert('Salvo!', `${exerciseToSave.name} foi atualizado.`);
   };
-  
-  exercise.calculatedTotalWeight = totalWeightForCalc();
 
-  return(
+  const toggleMode = () => {
+    handleValueChange('mode', localExercise.mode === 'calibrated' ? 'manual' : 'calibrated');
+  };
+
+  return (
     <View style={styles.card}>
-      <View style={styles.pickerContainer}>
-        <Picker selectedValue={exercise.masterId} onValueChange={(value) => handleValueChange('masterId', value)} style={styles.picker} dropdownIconColor="#A78BFA">
-          <Picker.Item label="Selecione um exercício..." value="" />
-          {masterExerciseList.map(me => <Picker.Item key={me.id} label={me.name} value={me.id} />)}
-        </Picker>
+      <View style={styles.cardHeader}>
+        <TextInput
+            style={styles.exerciseNameInput}
+            placeholder="Nome do Exercício"
+            placeholderTextColor="#9CA3AF"
+            value={localExercise.name}
+            onChangeText={(value) => handleValueChange('name', value)}
+        />
+        <TouchableOpacity onPress={() => onRemove(localExercise.id)} style={styles.deleteButton}>
+            <Icon name="trash-outline" size={20} color="white" />
+        </TouchableOpacity>
       </View>
-      <View style={styles.inputRow}>
-        <TextInput style={styles.input} placeholder={isBilateral && weightMode === 'perSide' ? "Peso por lado" : "Peso total"} placeholderTextColor="#9CA3AF" keyboardType="numeric" value={String(exercise.testWeight || '')} onChangeText={(value) => handleValueChange('testWeight', value)} />
-        <TextInput style={styles.input} placeholder="Reps" placeholderTextColor="#9CA3AF" keyboardType="numeric" value={String(exercise.testReps || '')} onChangeText={(value) => handleValueChange('testReps', value)} />
-        <TouchableOpacity onPress={() => onSave(exercise.id)} style={styles.saveButtonSmall}><Text style={styles.buttonTextSmall}>✓</Text></TouchableOpacity>
-        <TouchableOpacity onPress={() => onRemove(exercise.id)} style={styles.deleteButton}><Text style={styles.buttonTextSmall}>X</Text></TouchableOpacity>
+      
+      <View style={styles.switchRow}>
+          <Switch isOn={localExercise.mode === 'calibrated'} onToggle={toggleMode} />
+          <Text style={styles.switchLabel}>
+              {localExercise.mode === 'calibrated' ? 'Modo: Calibragem Automática' : 'Modo: Manual'}
+          </Text>
       </View>
-      {isBilateral && (
-        <View style={styles.switchRow}>
+
+      {localExercise.mode === 'calibrated' ? (
+        <>
+          <Text style={styles.modeDescription}>Insira um teste de força para o app calcular as cargas.</Text>
+          <View style={styles.inputRow}>
+              <TextInput style={styles.input} placeholder={"Peso do Teste"} placeholderTextColor="#9CA3AF" keyboardType="numeric" value={String(localExercise.testWeight || '')} onChangeText={(value) => handleValueChange('testWeight', value)} />
+              <TextInput style={styles.input} placeholder="Reps do Teste" placeholderTextColor="#9CA3AF" keyboardType="numeric" value={String(localExercise.testReps || '')} onChangeText={(value) => handleValueChange('testReps', value)} />
+          </View>
+        </>
+      ) : (
+        <>
+          <Text style={styles.modeDescription}>Defina manualmente as séries, repetições e carga.</Text>
+          <View style={styles.inputRow}>
+              <TextInput style={styles.input} placeholder="Séries (ex: 3)" placeholderTextColor="#9CA3AF" keyboardType="default" value={String(localExercise.manualSets || '')} onChangeText={(value) => handleValueChange('manualSets', value)} />
+              <TextInput style={styles.input} placeholder="Reps (ex: 8-10)" placeholderTextColor="#9CA3AF" keyboardType="default" value={String(localExercise.manualReps || '')} onChangeText={(value) => handleValueChange('manualReps', value)} />
+              <TextInput style={styles.input} placeholder="Carga (ex: 80kg)" placeholderTextColor="#9CA3AF" keyboardType="default" value={String(localExercise.manualLoad || '')} onChangeText={(value) => handleValueChange('manualLoad', value)} />
+          </View>
+        </>
+      )}
+
+      <View style={styles.switchRow}>
           <Switch isOn={weightMode === 'perSide'} onToggle={() => setWeightMode(prev => prev === 'total' ? 'perSide' : 'total')} />
           <Text style={styles.switchLabel}>Usar peso por lado (anilhas)</Text>
-        </View>
-      )}
+      </View>
+
+      <TouchableOpacity onPress={handleSave} style={styles.saveButton}>
+        <Text style={styles.buttonText}>Salvar {localExercise.name || 'Exercício'}</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
+
 // --- Componente Principal da Página ---
 const SetupPage = () => {
-  const { activeProfile, updateActivePlan } = useContext(TrainingContext);
-  
-  const [localPlan, setLocalPlan] = useState(() => JSON.parse(JSON.stringify(activeProfile?.plan || {})));
-  const [selectedDay, setSelectedDay] = useState(1);
-  const [exerciseToAdd, setExerciseToAdd] = useState('');
-
-  useEffect(() => {
-    setLocalPlan(JSON.parse(JSON.stringify(activeProfile?.plan || {})));
-  }, [activeProfile]);
-
-  const handleAddExercise = (methodology: 'custom' | 'calibrated') => {
-    const dayData = localPlan?.[selectedDay] || { dayName: 'Novo Treino', exercises: [] };
-    let newExercise: Exercise;
+    const route = useRoute<RouteProp<any>>();
+    const { activePlan, updateActivePlan } = useContext(TrainingContext);
     
-    if (methodology === 'custom') {
-        newExercise = { id: Date.now(), masterId: '', name: '', testWeight: '', testReps: '', oneRepMax: 0 };
-    } else {
-        if (!exerciseToAdd) return;
-        const masterEx = masterExerciseList.find(me => me.id === exerciseToAdd);
-        if (!masterEx) return;
-        newExercise = { id: Date.now(), masterId: masterEx.id, name: masterEx.name, sets: '', reps: '' };
-    }
+    const initialDay = route.params?.selectedDay ?? 1;
+    const [selectedDay, setSelectedDay] = useState(initialDay);
+    const [localPlan, setLocalPlan] = useState(() => JSON.parse(JSON.stringify(activePlan || {})));
 
-    const updatedExercises = [...dayData.exercises, newExercise];
-    const newPlan = { ...localPlan, [selectedDay]: { ...dayData, exercises: updatedExercises } };
-    
-    setLocalPlan(newPlan);
-    if(methodology === 'calibrated') {
-        updateActivePlan(newPlan); // Salva direto no modo calibrado
-        setExerciseToAdd(''); // Reseta o picker
-    }
-  };
-  
-  const handleRemoveExercise = (exerciseId: number) => {
-    const dayData = localPlan?.[selectedDay];
-    if (!dayData) return;
-    const exercises = dayData.exercises.filter((ex: Exercise) => ex.id !== exerciseId);
-    const newPlan = { ...localPlan, [selectedDay]: { ...dayData, exercises } };
-    setLocalPlan(newPlan);
-    updateActivePlan(newPlan); // Salva a remoção direto
-  };
-  
-  // Funções apenas para o modo CUSTOM
-  const handleExerciseChange = (exerciseId: number, field: keyof Exercise, value: string) => {
-    const dayData = localPlan?.[selectedDay];
-    if (!dayData) return;
-    const exercises = dayData.exercises.map( (ex: Exercise) => {
-      if (ex.id === exerciseId) {
-        const updatedExercise = { ...ex, [field]: value };
-        if (field === 'masterId') {
-          const masterEx = masterExerciseList.find(me => me.id === value);
-          updatedExercise.name = masterEx ? masterEx.name : 'Selecione um exercício';
+    useEffect(() => {
+        setLocalPlan(JSON.parse(JSON.stringify(activePlan || {})));
+    }, [activePlan]);
+
+    // Atualiza o dia selecionado se a rota mudar
+    useEffect(() => {
+        if (route.params?.selectedDay !== undefined) {
+            setSelectedDay(route.params.selectedDay);
         }
-        return updatedExercise;
-      }
-      return ex;
-    });
-    setLocalPlan({ ...localPlan, [selectedDay]: { ...dayData, exercises } });
-  };
+    }, [route.params?.selectedDay]);
+    
+    const handleAddExercise = () => {
+        const dayData = localPlan?.[selectedDay] || { dayName: 'Novo Treino', exercises: [] };
+        const newExercise: Exercise = { 
+            id: Date.now(),
+            name: '',
+            masterId: '',
+            mode: 'calibrated',
+        };
+        const updatedExercises = [...dayData.exercises, newExercise];
+        const newPlan = { ...localPlan, [selectedDay]: { ...dayData, exercises: updatedExercises } };
+        setLocalPlan(newPlan);
+    };
   
-  const handleSaveSingleExercise = (exerciseId: number) => {
-    if (!localPlan) return;
-    let planToSave = JSON.parse(JSON.stringify(localPlan));
-    const dayData = planToSave[selectedDay];
-    if (dayData?.exercises) {
-      const exerciseToUpdate = dayData.exercises.find((ex: Exercise) => ex.id === exerciseId);
-      if (exerciseToUpdate) {
-        exerciseToUpdate.oneRepMax = calculate1RM(exerciseToUpdate.calculatedTotalWeight, parseInt(exerciseToUpdate.testReps, 10));
-        updateActivePlan(planToSave);
-        Alert.alert('Exercício Salvo!', 'O 1RM foi atualizado.');
-      }
-    }
-  };
+    const handleRemoveExercise = (exerciseId: number) => {
+        const dayData = localPlan?.[selectedDay];
+        if (!dayData) return;
+        const exercises = dayData.exercises.filter((ex: Exercise) => ex.id !== exerciseId);
+        const newPlan = { ...localPlan, [selectedDay]: { ...dayData, exercises } };
+        updateActivePlan(newPlan);
+    };
   
-  const dayPlan = localPlan ? localPlan[selectedDay] : null;
+    const handleUpdateExercise = (updatedExercise: Exercise) => {
+        const dayData = localPlan?.[selectedDay];
+        if (!dayData) return;
+        const exercises = dayData.exercises.map((ex: Exercise) => 
+            ex.id === updatedExercise.id ? updatedExercise : ex
+        );
+        const newPlan = { ...localPlan, [selectedDay]: { ...dayData, exercises } };
+        updateActivePlan(newPlan);
+    };
+  
+    const dayPlan = localPlan ? localPlan[selectedDay] : null;
 
-  return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Editar Plano</Text>
-      
-      <View style={styles.pickerContainer}>
-        <Picker selectedValue={selectedDay} onValueChange={(itemValue) => setSelectedDay(itemValue)} style={styles.picker} dropdownIconColor="#A78BFA">
-            <Picker.Item label="Segunda-feira" value={1} />
-            <Picker.Item label="Terça-feira" value={2} />
-            <Picker.Item label="Quarta-feira" value={3} />
-            <Picker.Item label="Quinta-feira" value={4} />
-            <Picker.Item label="Sexta-feira" value={5} />
-            <Picker.Item label="Sábado" value={6} />
-            <Picker.Item label="Domingo" value={0} />
-        </Picker>
-      </View>
-
-      {activeProfile?.methodology === 'calibrated' ? (
-        <View style={styles.card}>
-            <Text style={styles.methodologyTitle}>Metodologia: Calibragem Automática</Text>
-            {dayPlan?.exercises.map((ex: Exercise) => (
-                <View key={ex.id} style={styles.calibratedExerciseRow}>
-                    <Text style={styles.exerciseName}>{ex.name}</Text>
-                    <TouchableOpacity onPress={() => handleRemoveExercise(ex.id)} style={styles.deleteButtonSmall}>
-                        <Text style={styles.buttonTextSmall}>X</Text>
-                    </TouchableOpacity>
-                </View>
-            ))}
+    return (
+        <ScrollView style={styles.container}>
+            <Text style={styles.title}>Editar Plano</Text>
             <View style={styles.pickerContainer}>
-                <Picker selectedValue={exerciseToAdd} onValueChange={(itemValue) => setExerciseToAdd(itemValue)} style={styles.picker} dropdownIconColor="#A78BFA">
-                    <Picker.Item label="Adicionar exercício ao dia..." value="" />
-                    {masterExerciseList.map(me => <Picker.Item key={me.id} label={me.name} value={me.id} />)}
+                <Picker selectedValue={selectedDay} onValueChange={setSelectedDay} style={styles.picker} dropdownIconColor="#A78BFA">
+                    <Picker.Item label="Domingo" value={0} />
+                    <Picker.Item label="Segunda-feira" value={1} />
+                    <Picker.Item label="Terça-feira" value={2} />
+                    <Picker.Item label="Quarta-feira" value={3} />
+                    <Picker.Item label="Quinta-feira" value={4} />
+                    <Picker.Item label="Sexta-feira" value={5} />
+                    <Picker.Item label="Sábado" value={6} />
                 </Picker>
             </View>
-            <TouchableOpacity onPress={() => handleAddExercise('calibrated')} style={[styles.button, styles.addButton]}>
-                <Text style={styles.buttonText}>+ Adicionar</Text>
-            </TouchableOpacity>
-        </View>
-      ) : (
-        <>
+
             {dayPlan?.exercises.map((ex: Exercise) => (
-                <CustomExerciseRow
+                <ExerciseSetupRow
                     key={ex.id}
                     exercise={ex}
-                    onExerciseChange={handleExerciseChange}
+                    onUpdate={handleUpdateExercise}
                     onRemove={handleRemoveExercise}
-                    onSave={handleSaveSingleExercise}
                 />
             ))}
-            <TouchableOpacity onPress={() => handleAddExercise('custom')} style={[styles.button, styles.addButton]}>
+            
+            <TouchableOpacity onPress={handleAddExercise} style={[styles.button, styles.addButton]}>
                 <Text style={styles.buttonText}>+ Adicionar Exercício</Text>
             </TouchableOpacity>
-        </>
-      )}
-    </ScrollView>
-  );
+        </ScrollView>
+    );
 };
 
 const styles = StyleSheet.create({
     container: { flex: 1, padding: 10, backgroundColor: '#111827' },
     title: { fontSize: 28, fontWeight: 'bold', color: 'white', textAlign: 'center', marginBottom: 20 },
     pickerContainer: { backgroundColor: '#374151', borderRadius: 8, marginBottom: 10, borderWidth: 1, borderColor: '#4B5563' },
-    picker: { color: 'white' },
+    picker: { color: 'white', height: 50, justifyContent: 'center' },
     card: { backgroundColor: '#1F2937', borderRadius: 12, padding: 15, marginBottom: 20 },
+    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', },
+    exerciseNameInput: { flex: 1, color: 'white', fontSize: 18, fontWeight: 'bold', paddingVertical: 10 },
+    deleteButton: { backgroundColor: '#EF4444', width: 40, height: 40, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+    switchRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 15 },
+    switchLabel: { color: '#D1D5DB', fontSize: 14, marginLeft: 10 },
+    modeDescription: { color: '#9CA3AF', fontSize: 12, fontStyle: 'italic', marginBottom: 10, paddingLeft: 5 },
     inputRow: { flexDirection: 'row', alignItems: 'center' },
     input: { backgroundColor: '#374151', color: 'white', borderRadius: 8, padding: 12, flex: 1, marginRight: 10 },
-    deleteButton: { backgroundColor: '#EF4444', width: 45, height: 45, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
-    saveButtonSmall: { backgroundColor: '#10B981', width: 45, height: 45, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
-    buttonTextSmall: { color: 'white', fontWeight: 'bold', fontSize: 18 },
+    saveButton: { backgroundColor: '#10B981', borderRadius: 8, padding: 15, alignItems: 'center', marginTop: 15 },
     button: { borderRadius: 8, padding: 15, alignItems: 'center', marginTop: 10 },
-    addButton: { backgroundColor: '#10B981' },
+    addButton: { backgroundColor: '#0EA5E9' },
     buttonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
-    switchRow: { flexDirection: 'row', alignItems: 'center', marginTop: 15 },
-    switchLabel: { color: '#D1D5DB', fontSize: 14, marginLeft: 10 },
-    methodologyTitle: { fontSize: 18, fontWeight: 'bold', color: '#A78BFA', textAlign: 'center', marginBottom: 20 },
-    calibratedExerciseRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#374151', padding: 15, borderRadius: 8, marginBottom: 10 },
-    exerciseName: { color: 'white', fontSize: 16 },
-    deleteButtonSmall: { backgroundColor: '#EF4444', width: 35, height: 35, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
 });
 
 export default SetupPage;

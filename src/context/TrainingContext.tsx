@@ -5,16 +5,24 @@ import { trainingPlan as initialPlan } from '../data/trainingPlan';
 // --- ESTRUTURAS DE TIPO ---
 export type Exercise = {
   id: number;
-  masterId: string;
   name: string;
-  sets: string;
-  reps: string;
-  oneRepMax?: number;
-  load?: number;
-  calculatedTotalWeight?: number;
+  masterId: string; // Mantemos para a metadata do exercício
+  
+  // Propriedade para controlar o modo
+  mode: 'calibrated' | 'manual';
+
+  // Propriedades para o modo 'calibrated'
   testWeight?: string;
   testReps?: string;
+  oneRepMax?: number;
+  calculatedTotalWeight?: number;
+
+  // Propriedades para o modo 'manual'
+  manualSets?: string;
+  manualReps?: string;
+  manualLoad?: string;
 };
+
 export type WorkoutDay = { dayName: string; exercises: Exercise[]; } | null;
 export type Plan = { [key: number]: WorkoutDay; };
 export type CalibrationData = { exerciseId: string; weight: number; reps: number; oneRepMax: number; } | null;

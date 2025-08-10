@@ -1,3 +1,6 @@
+
+import { TRAINING_PHASES } from '../data/trainingConfig';
+
 export const calculate1RM = (weight, reps) => {
   if (!weight || !reps || reps <= 0) return 0;
   if (reps === 1) return parseFloat(weight);
@@ -25,9 +28,20 @@ export const getTrainingPhase = (date) => {
 // Esta função calcula a carga de trabalho final
 export const getWorkingLoad = (oneRepMax, phase) => {
   if (!oneRepMax || oneRepMax <= 0 || !phase) return 'N/A';
-  
-  const percentage = LOAD_PERCENTAGES[phase];
-  const targetLoad = oneRepMax * percentage;
-  
-  return Math.round(targetLoad / 2.5) * 2.5;
+
+  const { intensity } = TRAINING_PHASES[phase]; // Pega a faixa de intensidade
+
+  const minLoad = oneRepMax * intensity.min;
+  const maxLoad = oneRepMax * intensity.max;
+
+  // Arredonda os valores para o múltiplo de 2.5 mais próximo
+  const roundedMin = Math.round(minLoad / 2.5) * 2.5;
+  const roundedMax = Math.round(maxLoad / 2.5) * 2.5;
+
+  // Se os valores forem iguais após o arredondamento, mostra só um
+  if (roundedMin === roundedMax) {
+      return `${roundedMax}kg`;
+  }
+
+  return `${roundedMin}kg - ${roundedMax}kg`;
 };
