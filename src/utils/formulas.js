@@ -29,19 +29,10 @@ export const getTrainingPhase = (date) => {
 export const getWorkingLoad = (oneRepMax, phase) => {
   if (!oneRepMax || oneRepMax <= 0 || !phase) return 'N/A';
 
-  const { intensity } = TRAINING_PHASES[phase]; // Pega a faixa de intensidade
+  // Agora pega a porcentagem única
+  const { percentage } = TRAINING_PHASES[phase];
+  const targetLoad = oneRepMax * percentage;
 
-  const minLoad = oneRepMax * intensity.min;
-  const maxLoad = oneRepMax * intensity.max;
-
-  // Arredonda os valores para o múltiplo de 2.5 mais próximo
-  const roundedMin = Math.round(minLoad / 2.5) * 2.5;
-  const roundedMax = Math.round(maxLoad / 2.5) * 2.5;
-
-  // Se os valores forem iguais após o arredondamento, mostra só um
-  if (roundedMin === roundedMax) {
-      return `${roundedMax}kg`;
-  }
-
-  return `${roundedMin}kg - ${roundedMax}kg`;
+  // Arredonda para o múltiplo de 2.5 mais próximo
+  return `${Math.round(targetLoad / 2.5) * 2.5}kg`;
 };

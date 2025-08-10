@@ -78,9 +78,12 @@ const HomePage = () => {
               >
                   <Text style={styles.buttonText}>Adicionar/Editar</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => {}} style={[styles.button, {backgroundColor: phaseConfig.color}]}>
-                  <Text style={styles.buttonText}>Começar Treino</Text>
-              </TouchableOpacity>
+              <TouchableOpacity 
+    onPress={() => navigation.navigate('ActiveWorkout', { workout: workoutForDay })} 
+    style={[styles.startButton, {backgroundColor: phaseConfig.color}]}
+>
+    <Text style={styles.startButtonText}>Começar Treino</Text>
+</TouchableOpacity>
             </View>
 
             <View style={styles.headerContainer}>
@@ -119,6 +122,8 @@ const styles = StyleSheet.create({
     exerciseName: { fontSize: 20, fontWeight: 'bold', color: '#F9FAFB', flexShrink: 1, paddingRight: 10 },
     exerciseDetails: { fontSize: 16, color: '#D1D5DB' },
     detailsRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#374151' },
+     startButton: { paddingVertical: 10, paddingHorizontal: 15, borderRadius: 8 },
+    startButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
 });
 
 export default HomePage;

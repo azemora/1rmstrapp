@@ -12,6 +12,7 @@ import CalibrationPage from './src/pages/CalibrationPage';
 import TimerPage from './src/pages/TimerPage';
 import CreateProfilePage from './src/pages/CreateProfilePage';
 import { RootStackParamList, DrawerParamList, HomeStackParamList } from './src/navigation/types';
+import ActiveWorkoutPage from './src/pages/ActiveWorkoutPage';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Drawer = createDrawerNavigator<DrawerParamList>();
@@ -37,10 +38,11 @@ function HomeNavigator() {
     <HomeNav.Navigator screenOptions={{ headerShown: false }}>
       <HomeNav.Screen name="HomePage" component={HomePage} />
       <HomeNav.Screen name="TimerPage" component={TimerPage} />
+      {/* ADICIONADO: A rota para a tela de treino ativo */}
+      <HomeNav.Screen name="ActiveWorkout" component={ActiveWorkoutPage} />
     </HomeNav.Navigator>
   );
 }
-
 // Nosso app principal, agora dentro de uma gaveta
 function MainAppDrawer() {
   return (

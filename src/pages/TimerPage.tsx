@@ -5,7 +5,11 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { Exercise } from '../context/TrainingContext';
 import { HomeStackParamList } from '../navigation/types';
 
-// ... (Tipos TimerPageRouteProp e TimerPageProps)
+type TimerPageRouteProp = RouteProp<HomeStackParamList, 'TimerPage'>;
+
+interface TimerPageProps {
+  route: TimerPageRouteProp;
+}
 
 const formatTime = (timeInSeconds: number) => {
     const minutes = Math.floor(timeInSeconds / 60);
@@ -22,25 +26,18 @@ const TimerPage: React.FC<TimerPageProps> = ({ route }) => {
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
-
     if (isActive && secondsLeft > 0) {
       interval = setInterval(() => {
         setSecondsLeft(s => s - 1);
       }, 1000);
     } else if (secondsLeft === 0) {
       setIsActive(false);
-      Vibration.vibrate([500, 500, 500]); // Vibra 3 vezes quando o tempo acaba
-      // Aqui poderíamos tocar um som
+      Vibration.vibrate([500, 500, 500]);
     }
-    
-    // Limpa o intervalo quando o componente é desmontado ou o timer para
     return () => { if(interval) clearInterval(interval) };
   }, [isActive, secondsLeft]);
 
-  const toggleTimer = () => {
-    setIsActive(!isActive);
-  };
-
+  const toggleTimer = () => setIsActive(!isActive);
   const resetTimer = () => {
     setIsActive(false);
     setSecondsLeft(phaseInfo.rest);
@@ -61,18 +58,15 @@ const TimerPage: React.FC<TimerPageProps> = ({ route }) => {
       
       <View style={styles.content}>
         <Text style={styles.exerciseName}>{exercise.name}</Text>
-        <Text style={styles.phaseName}>{phaseInfo.name} | {exercise.reps} reps</Text>
+        {/* CORREÇÃO AQUI: Usando phaseInfo.reps em vez de exercise.reps */}
+        <Text style={styles.phaseName}>{phaseInfo.name} | {phaseInfo.reps} reps</Text>
         
         <Text style={styles.timerDisplay}>{formatTime(secondsLeft)}</Text>
 
-        <TouchableOpacity 
-            onPress={secondsLeft === 0 ? resetTimer : toggleTimer} 
-            style={[styles.button, isActive && styles.pauseButton]}
-        >
+        <TouchableOpacity onPress={secondsLeft === 0 ? resetTimer : toggleTimer} style={[styles.button, isActive && styles.pauseButton]}>
           <Text style={styles.buttonText}>{getButtonText()}</Text>
         </TouchableOpacity>
         
-        {/* Mostra o botão de resetar apenas se o timer não estiver ativo e já tiver começado */}
         {!isActive && secondsLeft > 0 && secondsLeft < phaseInfo.rest && (
             <TouchableOpacity onPress={resetTimer} style={styles.resetButton}>
                 <Text style={styles.resetButtonText}>Resetar</Text>

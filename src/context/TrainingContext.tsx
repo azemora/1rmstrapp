@@ -23,6 +23,17 @@ export type Exercise = {
   manualLoad?: string;
 };
 
+export type LoggedSet = {
+    reps: number;
+    load: number;
+};
+
+export type WorkoutLog = {
+    date: string; // ex: "2025-08-09"
+    exerciseId: string;
+    sets: LoggedSet[];
+};
+
 export type WorkoutDay = { dayName: string; exercises: Exercise[]; } | null;
 export type Plan = { [key: number]: WorkoutDay; };
 export type CalibrationData = { exerciseId: string; weight: number; reps: number; oneRepMax: number; } | null;
@@ -33,6 +44,7 @@ export type Profile = {
   plan: Plan;
   methodology: 'calibrated' | 'custom';
   calibration: CalibrationData;
+  history: WorkoutLog[]; 
 };
 
 export type ProfilesData = {
@@ -63,6 +75,7 @@ const defaultProfile: Profile = {
     plan: blankPlan,
     methodology: 'calibrated',
     calibration: null,
+    history: []
 }
 
 const defaultProfilesData: ProfilesData = {
@@ -146,6 +159,7 @@ export const TrainingProvider = ({ children }: TrainingProviderProps) => {
           plan: blankPlan,
           methodology,
           calibration: null,
+          history: []
       };
       setProfilesData(prevData => {
           const updatedProfiles = { ...prevData.profiles, [newId]: newProfile };
