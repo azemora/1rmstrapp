@@ -14,31 +14,35 @@ interface ExerciseCardProps {
 }
 
 const ExerciseCard: React.FC<ExerciseCardProps> = ({ exercise, date, navigation }) => {
-  if (!exercise.oneRepMax || exercise.oneRepMax === 0) {
-    return (
-      <View style={styles.card}>
-        <Text style={styles.exerciseName}>{exercise.name}</Text>
-        <Text style={styles.exerciseDetails}>Calibragem pendente. Edite o plano para definir sua força.</Text>
-      </View>
-    );
-  }
-
+  const isManual = exercise.mode === 'manual';
   const phaseInfo = getTrainingPhase(date);
-  const workingLoad = getWorkingLoad(exercise.oneRepMax, phaseInfo.phase);
   const phaseConfig = TRAINING_PHASES[phaseInfo.phase];
+
+  let displaySets = isManual ? exercise.manualSets : phaseInfo.sets;
+  let displayReps = isManual ? exercise.manualReps : phaseInfo.reps;
+  let displayLoad = 'Calibrar'; // Padrão
+
+  if (isManual) {
+    displayLoad = exercise.manualLoad || 'Definir';
+  } else if (exercise.oneRepMax && exercise.oneRepMax > 0) {
+    displayLoad = getWorkingLoad(exercise.oneRepMax, phaseInfo.phase);
+  }
 
   return (
     <View style={[styles.card, { borderTopColor: phaseConfig.color, borderTopWidth: 4 }]}>
       <View style={styles.cardHeader}>
         <Text style={styles.exerciseName}>{exercise.name}</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('TimerPage', { exercise, phaseInfo: { ...phaseConfig, ...phaseInfo } })}>
+        <TouchableOpacity onPress={() => navigation.navigate('TimerPage', { 
+            exercise, 
+            phaseInfo: { ...phaseConfig, ...phaseInfo, sets: displaySets, reps: displayReps } 
+        })}>
           <Icon name="time-outline" size={28} color="#9CA3AF" />
         </TouchableOpacity>
       </View>
       <View style={styles.detailsRow}>
-        <Text style={styles.exerciseDetails}>Séries: {phaseInfo.sets}</Text>
-        <Text style={styles.exerciseDetails}>Repetições: {phaseInfo.reps}</Text>
-        <Text style={styles.exerciseDetails}>Carga: {workingLoad}</Text>
+        <Text style={styles.exerciseDetails}>Séries: {displaySets}</Text>
+        <Text style={styles.exerciseDetails}>Repetições: {displayReps}</Text>
+        <Text style={styles.exerciseDetails}>Carga: {displayLoad}</Text>
       </View>
     </View>
   );
